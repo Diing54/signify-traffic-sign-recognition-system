@@ -1,0 +1,19 @@
+
+# Ignore the entire dataset folder 
+
+dataset/
+
+
+# Ignore Python cache files
+
+__pycache__/
+
+*.pyc
+
+
+# Ignore environment files
+
+.DS_Store
+
+*.env
+
