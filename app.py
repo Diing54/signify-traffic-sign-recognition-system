@@ -13,20 +13,20 @@ import time
 from collections import deque
 import tempfile # To save temporary audio files
 
-# --- Initialize Flask App ---
+# Initialize Flask App
 app = Flask(__name__)
 
-# --- State Variables for TTS Logic ---
+# State Variables for TTS Logic 
 # Use a dictionary to store the last announcement time for each class ID
 announced_signs_memory = {}
 ANNOUNCE_MEMORY_DURATION = 3.0 # Seconds a sign type stays in memory to prevent immediate repeats
 last_announcement_time = 0
 ANNOUNCE_COOLDOWN = 2.0 # Minimum seconds between ANY announcement
 
-# --- Function to Run gTTS and Play Audio (with cleaning) ---
+# Function to Run gTTS and Play Audio 
 def announce_sign_thread_gtts(text):
     try:
-        # --- Clean up label text ---
+        # Clean up label text
         # 1. Remove category prefix (e.g., "regulatory--")
         parts = text.split('--')
         if len(parts) > 1:
@@ -36,7 +36,7 @@ def announce_sign_thread_gtts(text):
 
         # 2. Replace underscores with spaces
         clean_text = sign_name.replace('_', ' ')
-        # --- End cleaning ---
+        #  End cleaning 
         
         tts = gTTS(text=clean_text, lang='en', slow=False)
         
@@ -53,7 +53,7 @@ def announce_sign_thread_gtts(text):
     except Exception as e:
         print(f"Error during gTTS/playback: {e}")
 
-# --- Model and Camera Setup ---
+# Model and Camera Setup
 class TrafficSignDetector(Model):
     # (Initialization code remains the same)
     def __init__(self):
@@ -76,7 +76,7 @@ model = TrafficSignDetector()
 device.deploy(model)
 annotator = Annotator()
 CONF_THRESHOLD = 0.5
-print("✅ Model deployed. Starting camera stream.")
+print(" Model deployed. Starting camera stream.")
 
 def generate_frames():
     """Generator function to yield camera frames and trigger TTS."""
@@ -93,10 +93,10 @@ def generate_frames():
                 current_time = time.time()
                 labels_for_display = [] 
 
-                # --- 1. Filter Detections ---
+                # 1. Filter Detections
                 valid_detections = frame.detections[frame.detections.confidence > CONF_THRESHOLD]
 
-                # --- 2. Update and Clean Announcement Memory ---
+                # 2. Update and Clean Announcement Memory 
                 # Remove class IDs from memory if they haven't been announced recently
                 keys_to_remove = [
                     class_id for class_id, timestamp in announced_signs_memory.items()
@@ -106,14 +106,14 @@ def generate_frames():
                     for key in keys_to_remove:
                         del announced_signs_memory[key]
 
-                # --- 3. Identify New, Announceable Signs in This Frame ---
+                # 3. Identify New, Announceable Signs in This Frame
                 new_signs_this_frame = []
                 for det_idx, score, class_id, _ in valid_detections:
                     labels_for_display.append(f"{model.labels[class_id]}: {score:.2f}") 
                     if class_id not in announced_signs_memory:
                         new_signs_this_frame.append({'label': model.labels[class_id], 'score': score, 'id': class_id})
 
-                # --- 4. Decide Which Sign to Announce (if any) ---
+                # 4. Decide Which Sign to Announce (if any)
                 can_announce_now = (current_time - last_announcement_time > ANNOUNCE_COOLDOWN)
 
                 if new_signs_this_frame and can_announce_now:
@@ -127,9 +127,9 @@ def generate_frames():
 
                     announced_signs_memory[sign_to_announce['id']] = current_time
                     last_announcement_time = current_time
-                # --- End TTS Logic ---
+                # End TTS Logic
 
-                # --- 5. Annotate and Yield Frame ---
+                # 5. Annotate and Yield Frame
                 annotator.annotate_boxes(frame, valid_detections, labels=labels_for_display, alpha=0.3, corner_radius=10)
                 bgr_image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
                 (flag, encodedImage) = cv2.imencode(".jpg", bgr_image)
@@ -153,7 +153,7 @@ def video_feed():
     """Video streaming route."""
     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-# --- Main Execution ---
+# Main Execution 
 if __name__ == '__main__':
     if os.system("which mpg123 > /dev/null") != 0:
          print("WARNING: 'mpg123' command not found. Audio playback might fail.")

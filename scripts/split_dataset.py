@@ -27,7 +27,7 @@ if not image_files:
 
 print(f"Found {len(image_files)} images.")
 
-# --- Shuffle and Split ---
+# Shuffle and Split 
 random.seed(42) # for reproducible splits
 random.shuffle(image_files)
 

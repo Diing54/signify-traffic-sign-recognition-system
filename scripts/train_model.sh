@@ -18,7 +18,7 @@ yolo train \
     patience=50 \
     cache=True \
     workers=8 \
-    device=0  # <--- THIS LINE TELLS IT TO USE YOUR GPU
+    device=0  
 
-echo "--- Training Complete ---"
+echo "Training Complete"
 echo "Results saved in: runs/africa_model_gpu_v1/"
