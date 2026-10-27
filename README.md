@@ -1,143 +1,112 @@
-# Signify: An Embedded Assistive Traffic Sign Recognition System
+## Signify: An Embedded Assistive Traffic Sign Recognition System for Drivers with Visual Impairments.
 
-**A 4th-Year Computer Science project demonstrating a real-time, on-sensor AI system for detecting and announcing traffic signs to assist drivers.**
-
-![Python](https://img.shields.io/badge/Python-3.9-blue?logo=python)
-![YOLOv8](https://img.shields.io/badge/YOLO-v8-blueviolet)
-![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-5-C30039?logo=raspberrypi)
-![Sony IMX500](https://img.shields.io/badge/Sony-IMX500-lightgrey)
-
+- This repository contains the design, training pipeline, and deployment code for my final-year undergraduate project that I successfully defended at Strathmore University.
 ---
 
 ## 1. Project Overview
 
-This project addresses the challenge of driver inattention or visual impairment by creating a low-cost, low-power assistive system. It uses a quantized YOLOv8n model to detect 76 unique, region-specific traffic signs in real-time and provides clear, spoken audio alerts to the driver.
+Signify was developed to address the challenge of driver inattention and visual impairment by engineering a low-power, edge-deployed assistive system. It utilizes a quantized YOLOv8n model to detect 76 distinct traffic signs in real-time, delivering real-time text-to-speech audio alerts to the driver entirely offline. The project demonstrates the viability of shifting heavy ML inference away from host CPUs and directly onto sensor-level AI accelerators.
 
 ## 2. Key Features
 
-- **On-Sensor Inference:** The core technical achievement. The quantized YOLOv8n model runs directly on the Sony IMX500's internal AI accelerator, not the Raspberry Pi's CPU.
-- **Real-Time Performance:** This edge architecture frees the Pi's CPU, allowing the system to process detections and stream video with minimal latency.
-- **High-Accuracy Model:** Trained on a diverse, region-specific dataset of 76 traffic sign classes (19,000+ images), achieving a final **mAP50-95 of 69.5%**.
-- **Audio Alerts (TTS):** Uses Google's Text-to-Speech (`gTTS`) for natural, high-quality voice announcements (e.g., "Stop", "Speed Limit 50").
-- **Intelligent Logic:**
-    - **Label Cleaning:** Cleans complex labels (e.g., `regulatory--no_stopping` -> "no stopping").
-    - **Smart Cooldown:** Prevents "spam" by only announcing a specific sign type once every few seconds.
-    - **Bluetooth Wakeup Fix:** Programmatically plays a 0.5-second silent MP3 *before* each announcement to "wake up" sleeping Bluetooth speakers, preventing the first syllable (e.g., the "s" in "stop") from being cut off.
-- **Live Video Stream:** Hosts a Flask web server that streams the live, annotated video feed (with bounding boxes) to any browser on the network for monitoring or demonstration.
+- **Inference:** The quantized YOLOv8n model is deployed directly onto the Sony IMX500's internal AI accelerator. By offloading inference to the camera sensor, the Raspberry Pi is freed to handle tensor post-processing and application logic.
+- **Model Training:** The model was trained from scratch on the Traffic Signs Dataset (Mapillary and DFG), targeting 76 classes specific to the African region across 19,000+ images, achieving a final **mAP50-95 of 69.5%**.
+- **Audio Orchestration:** 
+    - Implemented string parsing to clean raw class labels (e.g., `regulatory--no_stopping` dynamically converts to "no stopping") for natural `gTTS` audio playback.
+    - Implemented a cooldown logic to prevent audio overlap during continuous detection of the same sign.
+- **Local Streaming:** Set up a lightweight Flask server on the edge node to stream the annotated video feed and detection bounding boxes over the local network for real-time monitoring.
 
 ## 3. System Architecture
 
-The system uses a two-part architecture:
-
-1.  **AI Camera (Sony IMX500):** This is the edge processor. It captures the image, runs the entire YOLOv8n model using the deployed `packerOut.zip` file, and generates the detection results (tensors).
-2.  **Host (Raspberry Pi 5):** This is the system orchestrator. It receives the tensors, post-processes them (NMS, filtering), manages the application logic (TTS state, cooldowns), and hosts the web stream.
+The system operates on a decoupled edge architecture:
+1. **Vision Node (Sony IMX500):** Captures frames and executes the `packerOut.zip` YOLOv8n inference locally on the sensor. It transmits only the resulting tensor data to the host.
+2. **Orchestration Layer (Raspberry Pi 5):** Intercepts the tensor payloads, applies Non-Maximum Suppression (NMS) and confidence filtering, manages the audio pipeline state, and serves the Flask video stream.
 
 ---
 
 ## 4. Final Training Results
 
-The model was trained on the **"Traffic Signs Dataset (Mapillary and DFG)"** for the Africa region (76 classes, 19k+ images) for 150 epochs.
+The model was trained for 150 epochs using local GPU compute for over 10 hours.
 
-**Final `best.pt` Model Performance (on validation set):**
-* **mAP50-95 (Primary Metric):** `0.695 (69.5%)`
-* **mAP50:** `0.769 (76.9%)`
-* **Precision:** `0.858 (85.8%)`
-* **Recall:** `0.676 (67.6%)`
+**Final `best.pt` Model Performance (Validation Set):**
+- **mAP50-95 (Primary Metric):** `0.695 (69.5%)`
+- **mAP50:** `0.769 (76.9%)`
+- **Precision:** `0.858 (85.8%)`
+- **Recall:** `0.676 (67.6%)`
 
-### Training Metrics (from `runs/africa_model_gpu_v1`)
-These graphs show the model's learning progress over the 150 epochs. The loss functions trend downwards (good) while the mAP/Precision/Recall metrics trend upwards (good).
+### Training Metrics
+Metrics from `runs/africa_model_gpu_v1` demonstrating consistent loss convergence and precision scaling across 150 epochs.
 
-![Training Metrics Graph](results/training_metrics.png)
+![Training Metrics Graph](docs/metrics/training_metrics.png)
 
-### Confusion Matrix (from `runs/africa_model_gpu_v1`)
-This matrix shows the model's performance on a per-class basis. Strong diagonal values indicate high accuracy for those classes.
+### Confusion Matrix
+Per-class evaluation indicating strong diagonal classification accuracy across the targeted African traffic sign subset.
 
-![Confusion Matrix](results/confusion_matrix.png)
+![Confusion Matrix](docs/metrics/confusion_matrix.png)
 
 ---
 
-## 5. Setup and Installation
+## 5. Setup and Reproduction
 
-This repository contains the code for both the training environment (on a powerful laptop) and the deployment environment (on the Raspberry Pi).
+If you have the hardware, you can train the model on your own and deploy it to the Raspberry Pi AI camera by following the instructions below:
 
-### A. Training Environment (Laptop)
+### A. Training & Quantization Environment
 
-This environment is used to train, validate, and quantize the model.
-
-1.  **Clone Repository:**
+1. **Clone Repository:**
     ```bash
-    git clone [https://github.com/is-project-4th-year/signify-traffic-sign-recognition-system.git](https://github.com/is-project-4th-year/signify-traffic-sign-recognition-system.git)
+    git clone [https://github.com/Diing54/signify-traffic-sign-recognition-system.git](https://github.com/Diing54/signify-traffic-sign-recognition-system.git)
     cd signify-traffic-sign-recognition-system
     ```
-2.  **Set up Python Environment:**
-    *It is highly recommended to use a virtual environment like Conda or venv.*
+2. **Environment Setup:**
     ```bash
     conda create -n traffic_signs python=3.9
     conda activate traffic_signs
-    ```
-3.  **Install Requirements:**
-    ```bash
     pip install -r requirements.txt
     ```
-4.  **Download Dataset:**
-    * Download the [Traffic Signs Dataset (Mapillary and DFG)](https://www.kaggle.com/datasets/nomihsa965/traffic-signs-dataset-mapillary-and-dfg) from Kaggle.
-    * Unzip and place its contents into a `dataset/` directory (this directory is ignored by Git via `.gitignore`).
-5.  **Run Data Splitting:**
-    * The dataset does not come pre-split. Run the provided script to split the data into `train/` and `val/` sets.
+3. **Dataset Preparation:**
+    * Download the [Traffic Signs Dataset (Mapillary and DFG)](https://www.kaggle.com/datasets/nomihsa965/traffic-signs-dataset-mapillary-and-dfg).
+    * Extract into `dataset/` (git-ignored) and execute the split script:
     ```bash
     python scripts/split_dataset.py
     ```
-6.  **Run Training:**
-    * This script will use your GPU (if `device=0` is set) to train the model.
+4. **Train the Model:**
     ```bash
     bash scripts/train_model.sh
     ```
-7.  **Quantize Model:**
-    * After training, this script takes the `best.pt` file and exports it to the `packerOut.zip` format required by the IMX500.
+5. **Compile for Sony IMX500:**
+    * Exports the `.pt` weights into the `packerOut.zip` format required by the sensor's accelerator.
     ```bash
-    python scripts/export_imx500_africa.py
+    python scripts/quantize.py
     ```
 
-### B. Deployment Environment (Raspberry Pi 5)
+### B. Edge Deployment (Raspberry Pi 5)
 
-This is the runtime environment that is mounted in the vehicle.
-
-1.  **Install Dependencies:**
-    *First, ensure your Pi has an internet connection.*
+1. **System Dependencies:**
     ```bash
     sudo apt update
     sudo apt install espeak libespeak1 ffmpeg mpg123 -y
     
-    # Install Python packages
+    # Python dependencies
     pip install gTTS flask opencv-python pydub --break-system-packages
     
-    # Install Sony's library
+    # Sony AITRIOS application library
     pip install git+[https://github.com/SonySemiconductorSolutions/aitrios-rpi-application-module-library.git](https://github.com/SonySemiconductorSolutions/aitrios-rpi-application-module-library.git)
     ```
-2.  **Transfer Files to Pi:**
-    * From your laptop, `scp` the necessary files to your Pi's home directory:
-    * `app.py` (This is the final script, e.g., `app8_pydub_fix.py` renamed to `app.py`)
-    * The quantized model: `packerOut.zip` (from your laptop's `runs/.../weights/best_imx_model/` folder)
-    * The labels file: `labels.txt` (from the same folder as `packerOut.zip`)
+2. **Deploy Artifacts to Edge Node:**
     ```bash
-    scp path/to/app.py dgara@<PI_IP_ADDRESS>:~/
-    scp path/to/packerOut.zip dgara@<PI_IP_ADDRESS>:~/finalyearproject2/
-    scp path/to/labels.txt dgara@<PI_IP_ADDRESS>:~/finalyearproject2/
+    scp deployment/app.py pi@<PI_IP_ADDRESS>:~/
+    scp deployment/imx500_model/packerOut.zip pi@<PI_IP_ADDRESS>:~/
+    scp deployment/imx500_model/labels.txt pi@<PI_IP_ADDRESS>:~/
     ```
-    *(Note: Ensure the paths inside `app.py` point to the correct locations, e.g., `/home/dgara/finalyearproject2/packerOut.zip`)*
-
-3.  **Run the Application:**
-    * Connect your Bluetooth speaker to the Raspberry Pi.
-    * Run the main application script:
+3. **Execution:**
+    * Pair the Bluetooth audio device to the Raspberry Pi.
     ```bash
     python app.py
     ```
-4.  **View the Stream:**
-    * On your laptop (or any device on the same network), open a web browser and go to:
-    **`http://<PI_IP_ADDRESS>:8000`**
-    *(e.g., `http://10.42.0.2:8000`)*
+4. **Stream:**
+    * Access the live inference feed via **`http://<PI_IP_ADDRESS>:8000`** on the local network.
 
 ---
 
 ## 6. License
-This project is licensed under the **MIT License**. See the `LICENSE` file for full details.
+This project is open-source under the **MIT License**. See `LICENSE` for full details.
